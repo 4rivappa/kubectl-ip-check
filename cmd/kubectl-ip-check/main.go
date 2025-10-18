@@ -17,7 +17,7 @@ import (
 func main() {
 	var rootCmd = &cobra.Command{
 		Use:   "kubectl aws-ip",
-		Short: "A kubectl plugin to calculate IP addresses usage in AWS EKS nodes",
+		Short: "plugin to improve visibility on IP address utilization",
 		Run:   run,
 	}
 

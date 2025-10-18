@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.24.2'
+    
+    - name: Build binaries and create archives
+      env:
+        CGO_ENABLED: 0
+      run: |
+        mkdir -p bin
+        VERSION=${GITHUB_REF#refs/tags/}
+        COMMIT=$(git rev-parse --short HEAD)
+        DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        LDFLAGS="-X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$DATE"
+
+        GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o kubectl-ip_check ./cmd/kubectl-ip-check
+        tar -czf bin/kubectl-ip-check-linux-amd64.tar.gz kubectl-ip_check LICENSE
+        rm kubectl-ip_check
+        
+        GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o kubectl-ip_check ./cmd/kubectl-ip-check
+        tar -czf bin/kubectl-ip-check-linux-arm64.tar.gz kubectl-ip_check LICENSE
+        rm kubectl-ip_check
+        
+        GOOS=darwin GOARCH=amd64 go build -ldflags "$LDFLAGS" -o kubectl-ip_check ./cmd/kubectl-ip-check
+        tar -czf bin/kubectl-ip-check-darwin-amd64.tar.gz kubectl-ip_check LICENSE
+        rm kubectl-ip_check
+        
+        GOOS=darwin GOARCH=arm64 go build -ldflags "$LDFLAGS" -o kubectl-ip_check ./cmd/kubectl-ip-check
+        tar -czf bin/kubectl-ip-check-darwin-arm64.tar.gz kubectl-ip_check LICENSE
+        rm kubectl-ip_check
+
+        GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o kubectl-ip_check.exe ./cmd/kubectl-ip-check
+        tar -czf bin/kubectl-ip-check-windows-amd64.tar.gz kubectl-ip_check.exe LICENSE
+        rm kubectl-ip_check.exe
+        
+        # Generate checksums
+        cd bin
+        sha256sum *.tar.gz > checksums.txt
+        cat checksums.txt
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          bin/*.tar.gz
+          bin/checksums.txt
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

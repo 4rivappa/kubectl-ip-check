@@ -1,19 +1,80 @@
-## kubectl-ip-check
+# kubectl ip-check
 
-A kubectl plugin to check ip address resources across the cluster nodes. Provides overall allocated, used and free IPs in cluster.
+A kubectl plugin to improve visibility on IP address utilization in EKS clusters with VPC CNI.
 
-Example: 
+![IP Check Img](./img/ip-check.png "ip-check")
+
+## Overview
+
+`ip-check` plugin is designed to check the status of IP addresses in your Kubernetes cluster. It provides visibility into total allocated IPs, used IPs, and free IPs throughout the cluster by fetching details from EC2 instances and analyzing pod IPs on each node.
+
+For each node, the plugin:
+- Retrieves total IP addresses from network interfaces attached to EC2 instances
+- Counts used IPs from pods that are not using host networking
+- Calculates free/unused IP addresses allocated to nodes
+
+**Currently supports:** AWS EKS clusters with VPC CNI
+
+## Installation
+
+### Via Krew (plugin manager)
+
+```bash
+# TODO: Will be available via krew once published
+kubectl krew install ip-check
 ```
-~ $ ./kubectl-ip-check-linux 
-Allocated IPs: 682 | Used IPs: 170 | Free IPs: 512
 
-NAME                              INSTANCE-ID           INSTANCE-TYPE   AVAILABILITY-ZONE   INTERNAL-IP       TOTAL-IPS   USED-IPS   FREE-IPS
-ip-192-168-10-106.ec2.internal    i-064adaf03c2efb4f2   t3.small        us-east-1a          192.168.10.106    8           3          5
-ip-192-168-101-147.ec2.internal   i-04f5d79942c711aa6   m5.2xlarge      us-east-1d          192.168.101.147   15          1          14
-ip-192-168-103-152.ec2.internal   i-01ef79740a15eea5d   m5.2xlarge      us-east-1d          192.168.103.152   30          5          25
-ip-192-168-11-45.ec2.internal     i-018fe96ee7b764915   t3.small        us-east-1a          192.168.11.45     8           3          5
-ip-192-168-11-69.ec2.internal     i-00aef0ee2330568cb   t3.small        us-east-1a          192.168.11.69     8           3          5
-ip-192-168-11-73.ec2.internal     i-06bdaf3673c7159b9   t3.small        us-east-1a          192.168.11.73     8           3          5
-ip-192-168-111-254.ec2.internal   i-02781e32ca8d3539a   m5.2xlarge      us-east-1d          192.168.111.254   30          5          25
-ip-192-168-116-45.ec2.internal    i-03fd3290d4503e43e   m5.2xlarge      us-east-1d          192.168.116.45    30          5          25
+### Manual Installation
+
+1. Download the latest tar zip from the [releases page](https://github.com/4rivappa/kubectl-ip-check/releases)
+2. Extract executable and place it in your PATH:
+
+```bash
+# Extract executable and move it to your PATH
+sudo mv kubectl-ip_check /usr/local/bin/kubectl-ip_check
 ```
+
+## Motivation
+
+With smaller CIDR ranges in VPC subnets, using default configurations of VPC CNI can quickly exhaust available IP addresses in the network. As shown in the example above, nearly 75-80% of IPs are unused but allocated to nodes in the cluster due to default configuration settings (`WARM_ENI_TARGET`, `WARM_IP_TARGET`).
+
+This plugin helps users:
+- **Gain visibility** into IP address usage across the cluster
+- **Detect overallocation** in IP allocation
+- **Optimize VPC CNI configuration** to mitigate IP exhaustion
+- **Plan capacity** for cluster scaling
+- **Troubleshoot** IP-related issues
+
+## How It Works
+
+The plugin operates by:
+
+1. **Discovering Nodes**: Uses the Kubernetes API to list all nodes in the cluster
+2. **Analyzing ENIs**: Calls AWS EC2 `DescribeNetworkInterfaces` API for each node instance to get total allocated IP addresses
+3. **Counting Pod IPs**: Queries Kubernetes API to count pod IPs on each node (excluding host-networked pods)
+4. **Calculating Usage**: Computes used vs. free IP addresses per node and aggregates cluster-wide statistics
+
+## Required Permissions
+
+The plugin requires the following permissions to function:
+
+**AWS:**
+- `ec2:DescribeNetworkInterfaces` permission for the instances in your cluster
+
+**Kubernetes:**
+- Read access to `nodes` and `pods` resources in the cluster
+
+## Configuration
+
+The plugin automatically detects your Kubernetes configuration from:
+1. In-cluster service account (when running inside a pod)
+2. `~/.kube/config` file
+3. `KUBECONFIG` environment variable
+
+AWS credentials are resolved using the standard AWS credential chain:
+1. Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+2. AWS credentials file (`~/.aws/credentials`)
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
