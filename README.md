@@ -20,7 +20,6 @@ For each node, the plugin:
 ### Via Krew (plugin manager)
 
 ```bash
-# TODO: Will be available via krew once published
 kubectl krew install ip-check
 ```
 
